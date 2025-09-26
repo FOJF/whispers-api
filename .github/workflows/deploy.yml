@@ -37,8 +37,8 @@ jobs:
           # 필요한 디렉토리 생성
           mkdir -p models uploads
           
-          # 환경변수 설정
-          export HUGGINGFACE_TOKEN="${{ secrets.HUGGINGFACE_TOKEN }}"
+          # .env 파일 생성 (HuggingFace 토큰 설정)
+          echo "HUGGINGFACE_TOKEN=${{ secrets.HUGGINGFACE_TOKEN }}" > .env
           
           # Docker 컨테이너 재시작
           docker-compose down || true
