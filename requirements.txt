@@ -1,0 +1,53 @@
+# FastAPI 및 웹 서버
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+
+# WhisperX 및 음성 처리
+whisperx==3.4.2
+torch>=2.0.0
+torchaudio>=2.0.0
+transformers>=4.30.0
+accelerate>=0.20.0
+
+# pyannote.audio 및 화자분리
+pyannote.audio>=3.3.2
+pyannote.core==5.0.0
+pyannote.database==5.0.1
+pyannote.metrics==3.2.1
+
+# 오디오 처리
+librosa==0.10.1
+soundfile==0.12.1
+ffmpeg-python==0.2.0
+
+# HuggingFace 및 모델 관리
+huggingface-hub>=0.16.0
+datasets>=2.12.0
+
+# 유틸리티
+numpy>=1.24.0
+scipy>=1.10.0
+pandas>=2.0.0
+tqdm>=4.65.0
+
+# 로깅 및 모니터링
+structlog>=23.1.0
+prometheus-client>=0.17.0
+
+# 개발 및 테스트
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+httpx>=0.24.0
+
+# 환경 변수 관리
+python-dotenv>=1.0.0
+
+# JSON 처리
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+
+# 파일 처리
+aiofiles>=23.2.0
+
+# CORS 및 미들웨어 (FastAPI에 내장됨)

@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  whisperx-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: whisperx-api
+    ports:
+      - "8000:8000"
+    environment:
+      # 서버 설정
+      - HOST=0.0.0.0
+      - PORT=8000
+      - LOG_LEVEL=INFO
+      
+      # 파일 업로드 설정
+      - MAX_FILE_SIZE=500
+      - UPLOAD_DIR=/tmp/whisperx_uploads
+      
+      # WhisperX 설정 (EC2 CPU 최적화)
+      - WHISPER_MODEL=large-v2
+      - DEVICE=cpu
+      - COMPUTE_TYPE=int8
+      
+      # HuggingFace 토큰 (GitHub Secrets에서 주입)
+      - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}
+      
+      # pyannote.audio 설정
+      - DIARIZATION_MODEL=pyannote/speaker-diarization-3.1
+      
+      # 언어 설정
+      - LANGUAGE=ko
+      
+      # 모델 캐시 설정
+      - MODEL_CACHE_DIR=/app/models
+      
+      # EC2 CPU 최적화 환경 변수
+      - OMP_NUM_THREADS=4
+      - MKL_NUM_THREADS=4
+      - NUMEXPR_NUM_THREADS=4
+      - OPENBLAS_NUM_THREADS=4
+      
+      # EC2 메모리 최적화
+      - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
+    volumes:
+      - ./models:/app/models
+      - ./uploads:/tmp/whisperx_uploads
+    restart: unless-stopped
+    # EC2 리소스 제한 설정
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+      start_period: 120s
+
+networks:
+  default:
+    name: whisperx-network

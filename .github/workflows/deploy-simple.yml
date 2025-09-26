@@ -1,0 +1,31 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Deploy to EC2
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USERNAME }}
+        key: ${{ secrets.EC2_SSH_KEY }}
+        script: |
+          cd /home/ubuntu/whisperx-api
+          git pull origin main
+          mkdir -p models uploads
+          export HUGGINGFACE_TOKEN="${{ secrets.HUGGINGFACE_TOKEN }}"
+          docker-compose down || true
+          docker-compose up -d --build
+          sleep 60
+          curl -f http://localhost:8000/health || exit 1
+          echo "✅ 배포 완료! http://${{ secrets.EC2_HOST }}:8000"
