@@ -20,9 +20,39 @@ jobs:
         username: ${{ secrets.EC2_USERNAME }}
         key: ${{ secrets.EC2_SSH_KEY }}
         script: |
+          set -e  # 에러 발생 시 스크립트 중단
+          
+          echo "🚀 배포 시작..."
+          
+          # 시스템 업데이트 및 필수 패키지 설치
+          echo "📦 시스템 패키지 업데이트 중..."
+          sudo apt-get update -y
+          sudo apt-get install -y git curl wget unzip
+          
+          # Docker 설치 확인 및 설치
+          if ! command -v docker &> /dev/null; then
+            echo "🐳 Docker 설치 중..."
+            curl -fsSL https://get.docker.com -o get-docker.sh
+            sudo sh get-docker.sh
+            sudo usermod -aG docker $USER
+            rm get-docker.sh
+          fi
+          
+          # Docker Compose 설치 확인 및 설치
+          if ! command -v docker-compose &> /dev/null; then
+            echo "🐳 Docker Compose 설치 중..."
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+          fi
+          
           # 프로젝트 디렉토리로 이동 (없으면 생성)
+          echo "📁 프로젝트 디렉토리 설정 중..."
           mkdir -p /home/ubuntu/whisperx-api
           cd /home/ubuntu/whisperx-api
+          
+          # Git 설정 (전역 설정이 없는 경우)
+          git config --global user.email "deploy@github.com" || true
+          git config --global user.name "Deploy Bot" || true
           
           # Git 저장소가 없으면 클론, 있으면 pull
           if [ ! -d .git ]; then
@@ -31,20 +61,60 @@ jobs:
             git checkout main
           else
             echo "📥 최신 코드 가져오는 중..."
-            git pull origin main
+            git fetch origin
+            git reset --hard origin/main
           fi
           
           # 필요한 디렉토리 생성
-          mkdir -p models uploads
+          echo "📁 필요한 디렉토리 생성 중..."
+          mkdir -p models uploads logs
           
           # .env 파일 생성 (HuggingFace 토큰 설정)
-          echo "HUGGINGFACE_TOKEN=${{ secrets.HUGGINGFACE_TOKEN }}" > .env
+          echo "🔐 환경 변수 설정 중..."
+          cat > .env << EOF
+          HUGGINGFACE_TOKEN=${{ secrets.HUGGINGFACE_TOKEN }}
+          ENVIRONMENT=production
+          LOG_LEVEL=INFO
+          EOF
           
-          # Docker 컨테이너 재시작
-          docker-compose down || true
-          docker-compose up -d --build
+          # Docker 서비스 시작
+          echo "🐳 Docker 서비스 시작 중..."
+          sudo systemctl start docker
+          sudo systemctl enable docker
           
-          # 헬스체크
+          # 기존 컨테이너 정리
+          echo "🧹 기존 컨테이너 정리 중..."
+          docker-compose down --remove-orphans || true
+          docker system prune -f || true
+          
+          # Docker 이미지 빌드 및 실행
+          echo "🔨 Docker 이미지 빌드 중..."
+          docker-compose build --no-cache
+          
+          echo "🚀 Docker 컨테이너 시작 중..."
+          docker-compose up -d
+          
+          # 컨테이너 상태 확인
+          echo "📊 컨테이너 상태 확인 중..."
           sleep 60
-          curl -f http://localhost:8000/health || exit 1
+          docker-compose ps
+          
+          # 헬스체크 (여러 번 시도) - WhisperX 모델 로딩 시간 고려
+          echo "🏥 헬스체크 중... (AI 모델 로딩으로 인해 시간이 오래 걸릴 수 있습니다)"
+          for i in {1..15}; do
+            echo "헬스체크 시도 $i/15... (대기 시간: $((i * 30))초)"
+            if curl -f http://localhost:8000/health; then
+              echo "✅ 헬스체크 성공!"
+              break
+            else
+              echo "❌ 헬스체크 실패, 30초 후 재시도... (AI 모델 로딩 중일 수 있습니다)"
+              sleep 30
+            fi
+          done
+          
+          # 최종 상태 확인
+          echo "📊 최종 컨테이너 상태:"
+          docker-compose ps
+          
           echo "✅ 배포 완료! http://${{ secrets.EC2_HOST }}:8000"
+          echo "📋 로그 확인: docker-compose logs -f"
