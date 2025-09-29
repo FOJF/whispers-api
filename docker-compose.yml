@@ -17,7 +17,7 @@ services:
       - UPLOAD_DIR=/tmp/whisperx_uploads
       
       # WhisperX 설정 (EC2 CPU 최적화)
-      - WHISPER_MODEL=large-v2
+      - WHISPER_MODEL=small
       - DEVICE=cpu
       - COMPUTE_TYPE=int8
       
@@ -45,13 +45,13 @@ services:
       - ./models:/app/models
       - ./uploads:/tmp/whisperx_uploads
     restart: unless-stopped
-    # EC2 리소스 제한 설정
+    # EC2 리소스 제한 설정 (small 모델 최적화)
     deploy:
       resources:
         limits:
-          memory: 4G
-        reservations:
           memory: 2G
+        reservations:
+          memory: 1G
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
