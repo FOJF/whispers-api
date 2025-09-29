@@ -45,13 +45,7 @@ services:
       - ./models:/app/models
       - ./uploads:/tmp/whisperx_uploads
     restart: unless-stopped
-    # EC2 리소스 제한 설정 (small 모델 최적화)
-    deploy:
-      resources:
-        limits:
-          memory: 2G
-        reservations:
-          memory: 1G
+    # EC2 리소스 제한 설정 제거 (자유로운 메모리 사용)
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s

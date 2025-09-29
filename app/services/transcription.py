@@ -13,7 +13,7 @@ import librosa
 import soundfile as sf
 
 from app.config import settings
-from app.models import TranscriptionResponse, TranscriptionSegment
+from app.models import TranscriptionResponse, TranscriptionSegment, SimpleTranscriptionResponse, SimpleTranscriptionSegment
 from app.services.file_handler import FileHandler
 
 logger = logging.getLogger(__name__)
@@ -348,6 +348,55 @@ class TranscriptionService:
             
         except Exception as e:
             logger.error(f"리소스 정리 실패: {str(e)}")
+    
+    async def transcribe_simple(self, audio_path: str, language: Optional[str] = None) -> SimpleTranscriptionResponse:
+        """단순 전사 (화자분리 없음)"""
+        if not self.is_initialized or not self.whisper_model:
+            raise RuntimeError("전사 서비스가 초기화되지 않았습니다.")
+        
+        start_time = time.time()
+        
+        try:
+            logger.info(f"단순 전사 시작: {audio_path}")
+            
+            # 오디오 로드
+            audio, sr = librosa.load(audio_path, sr=16000)
+            duration = len(audio) / sr
+            
+            # WhisperX로 전사
+            result = self.whisper_model.transcribe(audio, language=language or settings.LANGUAGE)
+            
+            # 세그먼트 변환
+            segments = []
+            full_text = ""
+            
+            for segment in result["segments"]:
+                segment_text = segment["text"].strip()
+                if segment_text:
+                    segments.append(SimpleTranscriptionSegment(
+                        start=segment["start"],
+                        end=segment["end"],
+                        text=segment_text,
+                        confidence=segment.get("avg_logprob")
+                    ))
+                    full_text += segment_text + " "
+            
+            processing_time = time.time() - start_time
+            
+            logger.info(f"단순 전사 완료: {processing_time:.2f}초")
+            
+            return SimpleTranscriptionResponse(
+                status="success",
+                transcription=segments,
+                processing_time=processing_time,
+                language=result.get("language", language or settings.LANGUAGE),
+                total_duration=duration,
+                full_text=full_text.strip()
+            )
+            
+        except Exception as e:
+            logger.error(f"단순 전사 실패: {str(e)}")
+            raise RuntimeError(f"전사 처리 중 오류가 발생했습니다: {str(e)}")
     
     def get_model_info(self) -> Dict[str, Any]:
         """로드된 모델 정보 반환"""

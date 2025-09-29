@@ -44,6 +44,22 @@ class FileInfo(BaseModel):
     size: int = Field(..., description="파일 크기 (바이트)")
     duration: Optional[float] = Field(None, description="오디오 길이 (초)")
 
+class SimpleTranscriptionSegment(BaseModel):
+    """단순 전사 세그먼트 모델 (화자분리 없음)"""
+    start: float = Field(..., description="시작 시간 (초)")
+    end: float = Field(..., description="종료 시간 (초)")
+    text: str = Field(..., description="전사된 텍스트")
+    confidence: Optional[float] = Field(None, description="신뢰도 점수")
+
+class SimpleTranscriptionResponse(BaseModel):
+    """단순 전사 응답 모델 (화자분리 없음)"""
+    status: str = Field(..., description="처리 상태")
+    transcription: List[SimpleTranscriptionSegment] = Field(..., description="전사 결과")
+    processing_time: float = Field(..., description="처리 시간 (초)")
+    language: str = Field(..., description="감지된 언어")
+    total_duration: float = Field(..., description="전체 오디오 길이 (초)")
+    full_text: str = Field(..., description="전체 전사 텍스트")
+
 class ProcessingStatus(BaseModel):
     """처리 상태 모델"""
     task_id: str = Field(..., description="작업 ID")

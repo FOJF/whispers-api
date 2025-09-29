@@ -13,6 +13,7 @@ import uvicorn
 from app.config import settings
 from app.models import (
     TranscriptionResponse, 
+    SimpleTranscriptionResponse,
     ErrorResponse, 
     HealthResponse,
     FileInfo
@@ -178,6 +179,77 @@ async def transcribe_audio_async(
         status_code=501,
         detail="비동기 전사 기능은 아직 구현되지 않았습니다."
     )
+
+@app.post("/v1/audio/transcribe-simple", response_model=SimpleTranscriptionResponse)
+async def transcribe_audio_simple(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(..., description="오디오/비디오 파일")
+):
+    """
+    오디오/비디오 파일을 업로드하여 단순 전사를 수행합니다. (화자분리 없음)
+    
+    Args:
+        file: 업로드된 오디오/비디오 파일
+        
+    Returns:
+        SimpleTranscriptionResponse: 전사 결과 (화자분리 없음)
+    """
+    if not transcription_service:
+        raise HTTPException(
+            status_code=503, 
+            detail="전사 서비스가 초기화되지 않았습니다."
+        )
+    
+    try:
+        # 파일 유효성 검사
+        if not file_handler.is_valid_file(file):
+            raise HTTPException(
+                status_code=400,
+                detail=f"지원하지 않는 파일 형식입니다. 지원 형식: {', '.join(settings.ALLOWED_EXTENSIONS)}"
+            )
+        
+        # 파일 크기 검사
+        if file.size and file.size > settings.MAX_FILE_SIZE:
+            raise HTTPException(
+                status_code=413,
+                detail=f"파일 크기가 너무 큽니다. 최대 크기: {settings.MAX_FILE_SIZE // (1024*1024)}MB"
+            )
+        
+        logger.info(f"단순 전사 파일 업로드 시작: {file.filename}")
+        
+        # 임시 파일로 저장
+        with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename)[1]) as temp_file:
+            content = await file.read()
+            temp_file.write(content)
+            temp_file_path = temp_file.name
+        
+        try:
+            # 단순 전사 수행
+            result = await transcription_service.transcribe_simple(
+                audio_path=temp_file_path,
+                language=settings.LANGUAGE
+            )
+            
+            # 임시 파일 정리 (백그라운드)
+            background_tasks.add_task(os.unlink, temp_file_path)
+            
+            logger.info(f"단순 전사 완료: {file.filename}")
+            return result
+            
+        except Exception as e:
+            # 에러 발생 시 임시 파일 정리
+            if os.path.exists(temp_file_path):
+                os.unlink(temp_file_path)
+            raise e
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"단순 전사 처리 중 오류 발생: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"전사 처리 중 오류가 발생했습니다: {str(e)}"
+        )
 
 @app.get("/v1/models/info")
 async def get_models_info():
