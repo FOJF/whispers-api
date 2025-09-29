@@ -38,6 +38,12 @@ jobs:
             rm get-docker.sh
           fi
           
+          # Docker 권한 문제 해결
+          echo "🔧 Docker 권한 설정 중..."
+          sudo usermod -aG docker $USER
+          sudo chmod 666 /var/run/docker.sock || true
+          sudo systemctl restart docker
+          
           # Docker Compose 설치 확인 및 설치
           if ! command -v docker-compose &> /dev/null; then
             echo "🐳 Docker Compose 설치 중..."
@@ -82,22 +88,27 @@ jobs:
           sudo systemctl start docker
           sudo systemctl enable docker
           
-          # 기존 컨테이너 정리
-          echo "🧹 기존 컨테이너 정리 중..."
-          docker-compose down --remove-orphans || true
-          docker system prune -f || true
+          # Docker 권한 재설정 (세션 새로고침)
+          echo "🔧 Docker 권한 재설정 중..."
+          sudo usermod -aG docker $USER
+          sudo chmod 666 /var/run/docker.sock || true
           
-          # Docker 이미지 빌드 및 실행
+          # 기존 컨테이너 정리 (sudo 사용)
+          echo "🧹 기존 컨테이너 정리 중..."
+          sudo docker-compose down --remove-orphans || true
+          sudo docker system prune -f || true
+          
+          # Docker 이미지 빌드 및 실행 (sudo 사용)
           echo "🔨 Docker 이미지 빌드 중..."
-          docker-compose build --no-cache
+          sudo docker-compose build --no-cache
           
           echo "🚀 Docker 컨테이너 시작 중..."
-          docker-compose up -d
+          sudo docker-compose up -d
           
           # 컨테이너 상태 확인
           echo "📊 컨테이너 상태 확인 중..."
           sleep 60
-          docker-compose ps
+          sudo docker-compose ps
           
           # 헬스체크 (여러 번 시도) - WhisperX 모델 로딩 시간 고려
           echo "🏥 헬스체크 중... (AI 모델 로딩으로 인해 시간이 오래 걸릴 수 있습니다)"
@@ -114,7 +125,7 @@ jobs:
           
           # 최종 상태 확인
           echo "📊 최종 컨테이너 상태:"
-          docker-compose ps
+          sudo docker-compose ps
           
           echo "✅ 배포 완료! http://${{ secrets.EC2_HOST }}:8000"
-          echo "📋 로그 확인: docker-compose logs -f"
+          echo "📋 로그 확인: sudo docker-compose logs -f"
